@@ -20,6 +20,8 @@
     "@angular/platform-browser-dynamic": "~11.2.4",
     "@angular/router": "~11.2.4",
     "@microsoft/signalr": "^6.0.10",
+    "bootstrap": "^5.2.2",
+    "ngx-bootstrap": "^9.0.0",
     "peerjs": "^1.4.7",
     "rxjs": "~6.6.0",
     "tslib": "^2.0.0",
