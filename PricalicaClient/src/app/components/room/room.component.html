@@ -1,17 +1,30 @@
-<input type="text" [(ngModel)]="callingPeerId" />
-<button (click)="callUser()">Enter</button>
 
-<video #video width="100%" height="40%"></video>
+<div class="input-group mb-3 " *ngIf="!isHost">
+  <span class="input-group-text">Room code</span>
+  <input type="text"  [(ngModel)]="callingPeerId" class="form-control"  />
+</div>
+<h5 *ngIf="isHost">Roomid: {{roomId}}</h5>
 
+<div class="w-100 row">
+  <div class="col-6">
+    <div class="col-12">
+      <video #video width="100%" height="100%"></video>
+    </div>
+    <div *ngFor="let video of videos" class="col-4">
+      <video #video width="50%" height="40%"  [srcObject]="video.srcObject" autoplay>
+      </video>
+    </div>
+  </div>
 
-<div *ngFor="let video of videos">
-  <video #video width="50%" height="40%"  [srcObject]="video.srcObject" autoplay>
-  </video>
+  <div class="col-6">
+    <div #chat class="h-75 messages"></div>
+    <input [(ngModel)]="message"  class="form-control">
+    <button (click)="sendMessage()" class="btn btn-primary">Send</button>
+  </div>
 </div>
 
 
-<input [(ngModel)]="message">
 
-<button (click)="sendMessage()">Send</button>
 
-<div #chat></div>
+
+

@@ -1,106 +1,123 @@
-import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import Peer from 'peerjs';
 import { HubService } from 'src/app/services/hub.service';
-
-interface GroupMember {
-  userName: string;
-  displayName: string;
-}
-interface VideoElement {
-  muted: boolean;
-  srcObject: MediaStream;
-  member: GroupMember;
-}
-
-interface Message{
-  message: string;
-  username: string;
-}
-
-interface IncommingMessage extends Message{
-  dateTime: Date;
-}
-
+import { Guid } from 'js-guid';
+import { GroupMember, User } from 'src/app/models/user.interfaces';
+import { IncommingMessage, VideoElement } from 'src/app/models/stream.interfaces';
+import {  Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 @Component({
   selector: 'app-room',
   templateUrl: './room.component.html',
-  styleUrls: ['./room.component.css'],
+  styleUrls: ['./room.component.scss'],
 })
-export class RoomComponent implements OnInit, AfterViewInit {
+export class RoomComponent implements OnInit, AfterViewInit, OnDestroy {
   roomId!: string | null;
   username!: string | null;
   myPeer!: Peer;
   peerId!: string;
   stream: any;
   message!: string;
+  isHost!: boolean;
+  connectedPeers: string[] = [];
 
   @ViewChild('video') localVideoPlayer!: ElementRef;
   @ViewChild('chat') chat!: ElementRef;
   enableVideo: boolean = true;
   enableAudio: boolean = true;
   videos: VideoElement[] = [];
+  usersInCall: User[] = [];
   callingPeerId!: string;
   metadata!: GroupMember;
 
+  destroySubject = new Subject();
+
   constructor(private route: ActivatedRoute, private hubService: HubService, private renderer: Renderer2) {}
 
+  ngOnDestroy(): void {
+    this.destroySubject.next();
+    this.destroySubject.complete();
+  }
+
   ngAfterViewInit(): void {
-    this.hubService.incommingMessageSubject.subscribe((incommingMessage: IncommingMessage) => {
+    this.hubService.incommingMessageSubject.pipe(takeUntil(this.destroySubject)).subscribe((incommingMessage: IncommingMessage) => {
       const message: HTMLParagraphElement = this.renderer.createElement('p');
       const date: HTMLParagraphElement = this.renderer.createElement('p');
+      const recievedDate = new Date(incommingMessage.dateTime);
       message.innerHTML = incommingMessage.message;
-      date.innerHTML = new Date(incommingMessage.dateTime).getDate().toString();
-      this.renderer.appendChild(this.chat.nativeElement, message);
+      date.innerHTML = recievedDate.getDay() + "/" + (recievedDate.getMonth()+1) + "/" + recievedDate.getFullYear();
+      if(this.username == incommingMessage.username){
+        message.classList.add('text-end');
+        date.classList.add('text-end')
+      }
       this.renderer.appendChild(this.chat.nativeElement, date);
+      this.renderer.appendChild(this.chat.nativeElement, message);
     })
   }
+
   async ngOnInit() {
-
-
-    this.route.queryParams.subscribe((params) => {
-      this.roomId = params['id'];
+    this.route.queryParams.pipe(takeUntil(this.destroySubject)).subscribe((params) => {
+      this.roomId = params['id'] ?? Guid.newGuid();
       this.username = params['username'];
       this.metadata = {
         displayName: params['username'],
         userName: params['username'],
       };
+
+      this.isHost = params['id'] == null;
     });
-    this.hubService.createHubConnection(
-      { username: this.username ?? '' },
-      this.roomId ?? ''
-    );
 
     await this.createLocalStream();
     this.myPeer = new Peer();
 
     this.myPeer.on('open', (id: string) => {
-      console.log(id);
       this.peerId = id;
+
+      this.hubService.createHubConnection(
+        { username: this.username ?? '' },
+        this.roomId ?? '',
+        this.peerId
+      );
     });
 
     this.myPeer.on('call', (call) => {
       call.answer(this.stream);
-      call.on('stream', (otherUser: MediaStream) => {
-        const alreadyExisting = this.videos.findIndex(
-          (video) => video.member.userName === call.metadata.userName
-        );
-        if (alreadyExisting != -1) {
-          return;
-        }
-        this.videos = [
-          ...this.videos,
-          {
-            muted: false,
-            srcObject: otherUser,
-            member: {
-              userName: call.metadata.userName,
-              displayName: call.metadata.userName,
+
+        //this.callUser(call.peer);
+        this.connectedPeers.push(call.peer);
+        call.on('stream', (otherUser: MediaStream) => {
+          const alreadyExisting = this.videos.findIndex(
+            (video) => video.member.userName === call.metadata.userName
+          );
+          if (alreadyExisting != -1) {
+            return;
+          }
+          this.videos = [
+            ...this.videos,
+            {
+              muted: false,
+              srcObject: otherUser,
+              member: {
+                userName: call.metadata.userName,
+                displayName: call.metadata.userName,
+              },
             },
-          },
-        ];
-      });
+          ];
+        });
     });
+
+    this.hubService.usersConnected.pipe(takeUntil(this.destroySubject)).subscribe((users: User[])=> {
+      debugger;
+        if(this.isHost){
+          users.forEach(user => {
+            if(this.usersInCall.findIndex(uc => uc.peerId == user.peerId) == -1 && this.peerId != user.peerId){
+              this.callUser(user.peerId as string);
+              this.usersInCall.push(user);
+            }
+          })
+        }
+    })
   }
 
   async createLocalStream() {
@@ -113,9 +130,29 @@ export class RoomComponent implements OnInit, AfterViewInit {
     this.localVideoPlayer.nativeElement.play();
   }
 
-  callUser() {
-    this.myPeer.call(this.callingPeerId, this.stream, {
+  callUser(callingPeer: string) {
+    let call = this.myPeer.call(callingPeer, this.stream, {
       metadata: this.metadata,
+    });
+
+    call.on('stream', (remoteStream) => {
+      const alreadyExisting = this.videos.findIndex(
+        (video) => video.member.userName === call.metadata.userName
+      );
+      if (alreadyExisting != -1) {
+        return;
+      }
+      this.videos = [
+        ...this.videos,
+        {
+          muted: false,
+          srcObject: remoteStream,
+          member: {
+            userName: call.metadata.userName,
+            displayName: call.metadata.userName,
+          },
+        },
+      ];
     });
   }
 
@@ -123,3 +160,5 @@ export class RoomComponent implements OnInit, AfterViewInit {
     this.hubService.sendMessage({message: this.message, username: this.username as string}).then(data => {console.log(data)});
   }
 }
+
+

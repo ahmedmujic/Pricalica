@@ -1,3 +1,18 @@
-<p>
-  home works!
-</p>
+<div class="container d-flex align-items-center">
+  <div class="row w-100">
+    <div class="col-6 d-flex align-items-center justify-content-center flex-column">
+      <div class="input-group mb-3 ">
+        <span class="input-group-text">Room code</span>
+        <input id="room-id" placeholder="00000000-0000-0000-0000-000000000000" name="roomCode" class="form-control"  [(ngModel)]="roomId">
+      </div>
+      <div class="input-group mb-3 ">
+        <span class="input-group-text" >Name</span>
+        <input id="room-id" placeholder="John" type="text" name="username" class="form-control" [(ngModel)]="username">
+      </div>
+      <button class="btn btn-primary" (click)="navigateToRoom()">New room</button>
+    </div>
+    <div class="col-6 d-flex justify-content-center">
+      <img src="../../../assets/images/chat-home.svg" class="chat-image" />
+    </div>
+  </div>
+</div>

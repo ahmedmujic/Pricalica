@@ -21,6 +21,7 @@
     "@angular/router": "~11.2.4",
     "@microsoft/signalr": "^6.0.10",
     "bootstrap": "^5.2.2",
+    "js-guid": "^1.0.0",
     "ngx-bootstrap": "^9.0.0",
     "peerjs": "^1.4.7",
     "rxjs": "~6.6.0",

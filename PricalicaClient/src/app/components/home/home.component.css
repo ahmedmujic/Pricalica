@@ -1,0 +1,6 @@
+.container{
+    height: 100vh;
+}
+.chat-image{
+    transform: scale(0.5);
+}

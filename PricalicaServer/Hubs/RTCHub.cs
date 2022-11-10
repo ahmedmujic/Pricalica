@@ -13,7 +13,12 @@ namespace Pricalica.Hubs
             var httpContext = Context.GetHttpContext();
             var roomId = httpContext?.Request.Query["roomId"].ToString();
             var username = httpContext?.Request.Query["username"].ToString();
-            var userInfo = new UserInfoDto { ConnectionId = Context.ConnectionId, Username = username };
+            var peerId = httpContext?.Request.Query["peerId"].ToString();
+            if (string.IsNullOrEmpty(peerId))
+            {
+                peerId = Rooms["roomId"].Select(r => r.PeerId).FirstOrDefault();
+            }
+            var userInfo = new UserInfoDto { ConnectionId = Context.ConnectionId, Username = username, PeerId = peerId };
             
             if(roomId == null)
             {
@@ -31,7 +36,7 @@ namespace Pricalica.Hubs
 
             await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
-            await Clients.Group(roomId).SendAsync("UserOnlineInGroup", username);
+            await Clients.Group(roomId).SendAsync("UserOnlineInGroup", Rooms[roomId].ToList());
         }
 
         public async Task SendMessage(CreateMessageDto messageDto)
