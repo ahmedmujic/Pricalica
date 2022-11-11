@@ -13,10 +13,7 @@ export class HubService {
   incommingMessageSubject: BehaviorSubject<IncommingMessage> = new BehaviorSubject<IncommingMessage>({message: 'Dobrodošli', username: 'bot', dateTime: new Date()});
   usersConnected: Subject<User[]> = new Subject<User[]>();
 
-  constructor() {
-  }
-
-  createHubConnection(user: User, roomId: string, peerId: string) {
+  createHubConnection(user: User, roomId: string, peerId: string, isHost: boolean) {
     this.hubConnection = new HubConnectionBuilder()
       .withUrl(
         environment.hubUrl + '?roomId=' + roomId + '&username=' + user.username + '&peerId=' + peerId
@@ -24,15 +21,19 @@ export class HubService {
       .withAutomaticReconnect()
       .build();
 
-    this.hubConnection.start().catch((err) => console.log(err));
+    this.hubConnection.start().then(_=>{
+      this.hubConnection.on('UsersInGroup', (users: User[]) => {
+        this.usersConnected.next(users);
+      });
 
-    this.hubConnection.on('UserOnlineInGroup', (users: User[]) => {
-      this.usersConnected.next(users);
-    });
+      this.hubConnection.on('NewMessage', (message: IncommingMessage) => {
+        this.incommingMessageSubject.next(message);
+      });
 
-    this.hubConnection.on('NewMessage', (message: IncommingMessage) => {
-      this.incommingMessageSubject.next(message);
-    });
+      if(!isHost){
+        this.hubConnection.invoke('GetOtherUsersInRoom')
+      }
+    }).catch((err) => console.log(err));
   }
 
   sendMessage(message: Message){

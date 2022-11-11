@@ -44,13 +44,17 @@ export class RoomComponent implements OnInit, AfterViewInit, OnDestroy {
     this.hubService.incommingMessageSubject.pipe(takeUntil(this.destroySubject)).subscribe((incommingMessage: IncommingMessage) => {
       const message: HTMLParagraphElement = this.renderer.createElement('p');
       const date: HTMLParagraphElement = this.renderer.createElement('p');
+      const user: HTMLParagraphElement = this.renderer.createElement('p');
       const recievedDate = new Date(incommingMessage.dateTime);
       message.innerHTML = incommingMessage.message;
       date.innerHTML = recievedDate.getDay() + "/" + (recievedDate.getMonth()+1) + "/" + recievedDate.getFullYear();
+      user.innerHTML = incommingMessage.username;
       if(this.username == incommingMessage.username){
         message.classList.add('text-end');
         date.classList.add('text-end')
+        user.classList.add('text-end')
       }
+      this.renderer.appendChild(this.chat.nativeElement, user);
       this.renderer.appendChild(this.chat.nativeElement, date);
       this.renderer.appendChild(this.chat.nativeElement, message);
     })
@@ -77,7 +81,8 @@ export class RoomComponent implements OnInit, AfterViewInit, OnDestroy {
       this.hubService.createHubConnection(
         { username: this.username ?? '' },
         this.roomId ?? '',
-        this.peerId
+        this.peerId,
+        this.isHost
       );
     });
 
@@ -109,10 +114,10 @@ export class RoomComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.hubService.usersConnected.pipe(takeUntil(this.destroySubject)).subscribe((users: User[])=> {
       debugger;
-        if(this.isHost){
+        if(!this.isHost){
           users.forEach(user => {
             if(this.usersInCall.findIndex(uc => uc.peerId == user.peerId) == -1 && this.peerId != user.peerId){
-              this.callUser(user.peerId as string);
+              this.callUser(user.peerId as string, user);
               this.usersInCall.push(user);
             }
           })
@@ -130,14 +135,15 @@ export class RoomComponent implements OnInit, AfterViewInit, OnDestroy {
     this.localVideoPlayer.nativeElement.play();
   }
 
-  callUser(callingPeer: string) {
+  callUser(callingPeer: string, user: User) {
+    debugger;
     let call = this.myPeer.call(callingPeer, this.stream, {
       metadata: this.metadata,
     });
 
     call.on('stream', (remoteStream) => {
       const alreadyExisting = this.videos.findIndex(
-        (video) => video.member.userName === call.metadata.userName
+        (video) => video.member.userName === user.username
       );
       if (alreadyExisting != -1) {
         return;
@@ -148,8 +154,8 @@ export class RoomComponent implements OnInit, AfterViewInit, OnDestroy {
           muted: false,
           srcObject: remoteStream,
           member: {
-            userName: call.metadata.userName,
-            displayName: call.metadata.userName,
+            userName:  user.username,
+            displayName:  user.username,
           },
         },
       ];

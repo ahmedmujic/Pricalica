@@ -39,6 +39,12 @@ namespace Pricalica.Hubs
             await Clients.Group(roomId).SendAsync("UserOnlineInGroup", Rooms[roomId].ToList());
         }
 
+        public async Task GetOtherUsersInRoom()
+        {
+            var roomId = Rooms.Where(r => r.Value.FirstOrDefault(u => u.ConnectionId == Context.ConnectionId) != null).FirstOrDefault().Key;
+            await Clients.Caller.SendAsync("UsersInGroup", Rooms[roomId].ToList());
+        }
+
         public async Task SendMessage(CreateMessageDto messageDto)
         {
             var roomId = Rooms.Where(r => r.Value.FirstOrDefault(u => u.ConnectionId == Context.ConnectionId) != null).FirstOrDefault().Key;
@@ -48,6 +54,8 @@ namespace Pricalica.Hubs
 
         public override async Task OnDisconnectedAsync(Exception exception)
         {
+            var disconnectedUser = Rooms.Where(r => r.Value.FirstOrDefault(u => u.ConnectionId == Context.ConnectionId) != null).FirstOrDefault().Key;
+            Rooms.Remove(disconnectedUser);
             await Clients.All.SendAsync("UserDisconnect", Context.ConnectionId);
             await base.OnDisconnectedAsync(exception);
         }
